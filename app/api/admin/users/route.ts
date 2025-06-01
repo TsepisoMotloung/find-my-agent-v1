@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { Employee } from "@/lib/models";
-import { employeeSchema } from "@/lib/validations/schemas";
-import { generateUniqueQRId } from "@/lib/utils/qr";
+import { User, Agent, Employee } from "@/lib/models";
 import { Op } from "sequelize";
 
 export async function GET(request: NextRequest) {
@@ -16,69 +14,52 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
+    const role = searchParams.get("role");
+    const approved = searchParams.get("approved");
     const search = searchParams.get("search") || "";
 
     const offset = (page - 1) * limit;
 
     const whereClause: any = {};
+    if (role) whereClause.role = role;
+    if (approved !== null) whereClause.is_approved = approved === "true";
     if (search) {
       whereClause[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
         { email: { [Op.like]: `%${search}%` } },
-        { department: { [Op.like]: `%${search}%` } },
-        { position: { [Op.like]: `%${search}%` } },
-        { branch: { [Op.like]: `%${search}%` } },
       ];
     }
 
-    const { count, rows } = await Employee.findAndCountAll({
+    const { count, rows } = await User.findAndCountAll({
       where: whereClause,
+      attributes: ["id", "name", "email", "role", "is_approved", "created_at"],
+      include: [
+        {
+          model: Agent,
+          as: "agent",
+          attributes: ["id", "name", "branch"],
+          required: false,
+        },
+        {
+          model: Employee,
+          as: "employee",
+          attributes: ["id", "name", "department"],
+          required: false,
+        },
+      ],
       limit,
       offset,
       order: [["created_at", "DESC"]],
     });
 
     return NextResponse.json({
-      employees: rows,
+      users: rows,
       total: count,
       page,
       totalPages: Math.ceil(count / limit),
     });
   } catch (error) {
-    console.error("Error fetching employees:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const validatedData = employeeSchema.parse(body);
-
-    const qrCode = generateUniqueQRId();
-
-    const employee = await Employee.create({
-      ...validatedData,
-      qr_code: qrCode,
-    });
-
-    return NextResponse.json(employee, { status: 201 });
-  } catch (error) {
-    console.error("Error creating employee:", error);
-    if (error.name === "ZodError") {
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 },
-      );
-    }
+    console.error("Error fetching users:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -94,31 +75,41 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, ...updateData } = body;
+    const { id, is_approved, role } = body;
 
-    const validatedData = employeeSchema.partial().parse(updateData);
+    const updateData: any = {};
+    if (is_approved !== undefined) updateData.is_approved = is_approved;
+    if (role) updateData.role = role;
 
-    const [updatedRowsCount] = await Employee.update(validatedData, {
+    const [updatedRowsCount] = await User.update(updateData, {
       where: { id },
     });
 
     if (updatedRowsCount === 0) {
-      return NextResponse.json(
-        { error: "Employee not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const updatedEmployee = await Employee.findByPk(id);
-    return NextResponse.json(updatedEmployee);
+    const updatedUser = await User.findByPk(id, {
+      attributes: ["id", "name", "email", "role", "is_approved", "created_at"],
+      include: [
+        {
+          model: Agent,
+          as: "agent",
+          attributes: ["id", "name", "branch"],
+          required: false,
+        },
+        {
+          model: Employee,
+          as: "employee",
+          attributes: ["id", "name", "department"],
+          required: false,
+        },
+      ],
+    });
+
+    return NextResponse.json(updatedUser);
   } catch (error) {
-    console.error("Error updating employee:", error);
-    if (error.name === "ZodError") {
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 },
-      );
-    }
+    console.error("Error updating user:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -138,25 +129,30 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { error: "Employee ID is required" },
+        { error: "User ID is required" },
         { status: 400 },
       );
     }
 
-    const deletedRowsCount = await Employee.destroy({
+    // Don't allow deleting the current admin user
+    if (session.user.id === id) {
+      return NextResponse.json(
+        { error: "Cannot delete your own account" },
+        { status: 400 },
+      );
+    }
+
+    const deletedRowsCount = await User.destroy({
       where: { id: parseInt(id) },
     });
 
     if (deletedRowsCount === 0) {
-      return NextResponse.json(
-        { error: "Employee not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Employee deleted successfully" });
+    return NextResponse.json({ message: "User deleted successfully" });
   } catch (error) {
-    console.error("Error deleting employee:", error);
+    console.error("Error deleting user:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

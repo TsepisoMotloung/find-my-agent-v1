@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, LoginFormData } from "@/lib/validations/schemas";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Shield, Mail, Lock } from "lucide-react";
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -52,109 +52,135 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50/20 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link
           href="/"
-          className="flex items-center justify-center text-primary-600 hover:text-primary-700 mb-6"
+          className="inline-flex items-center text-gray-600 hover:text-primary-600 mb-8 transition-colors duration-200 group"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
           Back to Home
         </Link>
 
-        <h2 className="text-center text-3xl font-bold text-gray-900">
-          Staff Sign In
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Sign in to your Alliance Insurance account
-        </p>
+        <div className="text-center">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-700 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Staff Sign In
+          </h2>
+          <p className="text-gray-600">
+            Sign in to your Alliance Insurance account
+          </p>
+        </div>
       </div>
 
+      {/* Form */}
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="card">
-          <div className="card-body">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary-600/5 to-primary-700/5 rounded-3xl blur-2xl"></div>
+          <div className="relative bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-600 font-medium">{error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Email Field */}
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-semibold text-gray-900 mb-2"
                 >
                   Email Address
                 </label>
-                <div className="mt-1">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
                   <input
                     {...register("email")}
                     type="email"
                     autoComplete="email"
-                    className="input-field"
-                    placeholder="Enter your email"
+                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all duration-200 text-gray-900 placeholder-gray-500"
+                    placeholder="Enter your email address"
                   />
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">
+                    <p className="mt-2 text-sm text-red-600">
                       {errors.email.message}
                     </p>
                   )}
                 </div>
               </div>
 
+              {/* Password Field */}
               <div>
                 <label
                   htmlFor="password"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-semibold text-gray-900 mb-2"
                 >
                   Password
                 </label>
-                <div className="mt-1 relative">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
                   <input
                     {...register("password")}
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    className="input-field pr-10"
+                    className="w-full pl-12 pr-12 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all duration-200 text-gray-900 placeholder-gray-500"
                     placeholder="Enter your password"
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center hover:bg-gray-50 rounded-r-xl transition-colors duration-200"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-5 w-5 text-gray-400" />
+                      <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                     ) : (
-                      <Eye className="h-5 w-5 text-gray-400" />
+                      <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                     )}
                   </button>
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">
+                    <p className="mt-2 text-sm text-red-600">
                       {errors.password.message}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div>
+              {/* Submit Button */}
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-8 py-4 rounded-xl font-bold transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 disabled:transform-none disabled:shadow-lg"
                 >
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Signing in...</span>
+                    </div>
+                  ) : (
+                    "Sign In"
+                  )}
                 </button>
               </div>
             </form>
 
-            <div className="mt-6">
+            {/* Divider */}
+            <div className="mt-8">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
+                  <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">
+                  <span className="px-4 bg-white text-gray-500 font-medium">
                     Need an account?
                   </span>
                 </div>
@@ -163,7 +189,7 @@ export default function SignInPage() {
               <div className="mt-6 text-center">
                 <Link
                   href="/auth/register"
-                  className="text-primary-600 hover:text-primary-500 text-sm font-medium"
+                  className="text-primary-600 hover:text-primary-700 font-semibold transition-colors duration-200"
                 >
                   Register as Agent or Frontline Staff
                 </Link>
@@ -171,6 +197,13 @@ export default function SignInPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-8 text-center">
+        <p className="text-sm text-gray-500">
+          © 2025 Alliance Insurance. All rights reserved.
+        </p>
       </div>
     </div>
   );

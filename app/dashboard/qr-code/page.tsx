@@ -46,7 +46,7 @@ export default function QRCodePage() {
         }
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.log("Error fetching profile:", error);
     } finally {
       setLoading(false);
     }

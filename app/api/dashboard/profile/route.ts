@@ -6,12 +6,14 @@ import { Agent, Employee, User } from "@/lib/models";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role === "admin") {
+
+    // Check if user is authenticated
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Find the user's agent or employee record
-    const user = await User.findOne({
+    const user = (await User.findOne({
       where: { id: session.user.id },
       include: [
         {
@@ -25,20 +27,46 @@ export async function GET(request: NextRequest) {
           required: false,
         },
       ],
-    });
+    })) as any; // Type assertion to handle Sequelize associations
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Handle different user roles
+    if (user.role === "admin") {
+      // Admin users don't have agent/employee profiles
+      return NextResponse.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        type: "admin",
+      });
     }
 
     const isAgent = user.role === "agent";
     const profile = isAgent ? user.agent : user.employee;
 
     if (!profile) {
-      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: `${isAgent ? "Agent" : "Employee"} profile not found. Please contact an administrator.`,
+        },
+        { status: 404 },
+      );
     }
 
-    return NextResponse.json(profile);
+    // Return profile with user info
+    return NextResponse.json({
+      ...profile.toJSON(),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (error) {
     console.error("Error fetching profile:", error);
     return NextResponse.json(

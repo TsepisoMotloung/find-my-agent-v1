@@ -7,43 +7,44 @@ import { generateQRCode, generateUniqueQRData } from "@/lib/utils/qr";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role === "admin") {
+
+    // Allow access for agent and frontline users only
+    if (!session?.user || session.user.role === "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the user's agent or employee record
-    const user = await User.findOne({
-      where: { id: session.user.id },
-      include: [
-        {
-          model: Agent,
-          as: "agent",
-          required: false,
-        },
-        {
-          model: Employee,
-          as: "employee",
-          required: false,
-        },
-      ],
-    });
+    // Find the user first
+    const user = await User.findByPk(session.user.id);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const isAgent = user.role === "agent";
-    const profile = isAgent ? user.agent : user.employee;
+    // Find the appropriate profile based on role
+    let profile: any;
+    let profileType: string;
+
+    if (user.role === "agent") {
+      profile = await Agent.findOne({ where: { user_id: user.id } });
+      profileType = "agent";
+    } else if (user.role === "frontline") {
+      profile = await Employee.findOne({ where: { user_id: user.id } });
+      profileType = "employee";
+    } else {
+      return NextResponse.json({ error: "Invalid user role" }, { status: 400 });
+    }
 
     if (!profile) {
-      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: `${profileType} profile not found`,
+        },
+        { status: 404 },
+      );
     }
 
     // Generate QR code data URL
-    const qrData = generateUniqueQRData(
-      isAgent ? "agent" : "employee",
-      profile.id,
-    );
+    const qrData = generateUniqueQRData(profileType, profile.id);
     const qrCodeDataURL = await generateQRCode(qrData);
 
     // Convert data URL to buffer

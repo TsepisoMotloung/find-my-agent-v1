@@ -1,53 +1,68 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { Agent, Employee, Rating, Complaint, Question, User } from '@/lib/models';
-import sequelize from '@/lib/database';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import {
+  Agent,
+  Employee,
+  Rating,
+  Complaint,
+  Question,
+  User,
+} from "@/lib/models";
+import sequelize from "@/lib/database";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role === 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Allow access for agent and frontline users only
+    if (!session?.user || session.user.role === "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the user's agent or employee record
-    const user = await User.findOne({
-      where: { id: session.user.id },
-      include: [
-        {
-          model: Agent,
-          as: 'agent',
-          required: false
-        },
-        {
-          model: Employee,
-          as: 'employee',
-          required: false
-        }
-      ]
-    });
+    // Find the user first
+    const user = await User.findByPk(session.user.id);
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const isAgent = user.role === 'agent';
-    const targetId = isAgent ? user.agent?.id : user.employee?.id;
-    const targetField = isAgent ? 'agent_id' : 'employee_id';
+    // Find the appropriate profile based on role
+    let targetId: number;
+    let targetField: string;
 
-    if (!targetId) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    if (user.role === "agent") {
+      const agent = await Agent.findOne({ where: { user_id: user.id } });
+      if (!agent) {
+        return NextResponse.json(
+          { error: "Agent profile not found" },
+          { status: 404 },
+        );
+      }
+      targetId = agent.id;
+      targetField = "agent_id";
+    } else if (user.role === "frontline") {
+      const employee = await Employee.findOne({ where: { user_id: user.id } });
+      if (!employee) {
+        return NextResponse.json(
+          { error: "Employee profile not found" },
+          { status: 404 },
+        );
+      }
+      targetId = employee.id;
+      targetField = "employee_id";
+    } else {
+      return NextResponse.json({ error: "Invalid user role" }, { status: 400 });
     }
 
     // Get rating statistics
     const ratingStats = await Rating.findAll({
       where: { [targetField]: targetId },
       attributes: [
-        [sequelize.fn('COUNT', sequelize.col('id')), 'totalRatings'],
-        [sequelize.fn('AVG', sequelize.col('rating_value')), 'averageRating']
+        [sequelize.fn("COUNT", sequelize.col("id")), "totalRatings"],
+        [sequelize.fn("AVG", sequelize.col("rating_value")), "averageRating"],
       ],
-      raw: true
+      raw: true,
     });
 
     const totalRatings = parseInt(ratingStats[0]?.totalRatings as any) || 0;
@@ -57,19 +72,22 @@ export async function GET(request: NextRequest) {
     const complaintStats = await Complaint.findAll({
       where: { [targetField]: targetId },
       attributes: [
-        [sequelize.fn('COUNT', sequelize.col('id')), 'totalComplaints'],
+        [sequelize.fn("COUNT", sequelize.col("id")), "totalComplaints"],
         [
-          sequelize.fn('SUM', 
-            sequelize.literal(`CASE WHEN status = 'pending' THEN 1 ELSE 0 END`)
-          ), 
-          'pendingComplaints'
-        ]
+          sequelize.fn(
+            "SUM",
+            sequelize.literal(`CASE WHEN status = 'pending' THEN 1 ELSE 0 END`),
+          ),
+          "pendingComplaints",
+        ],
       ],
-      raw: true
+      raw: true,
     });
 
-    const totalComplaints = parseInt(complaintStats[0]?.totalComplaints as any) || 0;
-    const pendingComplaints = parseInt(complaintStats[0]?.pendingComplaints as any) || 0;
+    const totalComplaints =
+      parseInt(complaintStats[0]?.totalComplaints as any) || 0;
+    const pendingComplaints =
+      parseInt(complaintStats[0]?.pendingComplaints as any) || 0;
 
     // Get recent ratings
     const recentRatings = await Rating.findAll({
@@ -77,20 +95,20 @@ export async function GET(request: NextRequest) {
       include: [
         {
           model: Question,
-          as: 'question',
-          attributes: ['id', 'question_text']
-        }
+          as: "question",
+          attributes: ["id", "question_text"],
+        },
       ],
       limit: 10,
-      order: [['created_at', 'DESC']]
+      order: [["created_at", "DESC"]],
     });
 
     // Get recent complaints
     const recentComplaints = await Complaint.findAll({
       where: { [targetField]: targetId },
-      attributes: ['id', 'subject', 'complainant_name', 'status', 'created_at'],
+      attributes: ["id", "subject", "complainant_name", "status", "created_at"],
       limit: 10,
-      order: [['created_at', 'DESC']]
+      order: [["created_at", "DESC"]],
     });
 
     return NextResponse.json({
@@ -99,10 +117,13 @@ export async function GET(request: NextRequest) {
       totalComplaints,
       pendingComplaints,
       recentRatings,
-      recentComplaints
+      recentComplaints,
     });
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Error fetching dashboard stats:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
